@@ -1,0 +1,13 @@
+Questions about Splitter Contract: 
+
+Question 1
+When to use Structs[] versus mapping? What is more efficient when working on the blockchain? 
+I know you can specify structs to save in memory, but is there a way to save mapping as well...or? 
+Indexing variables from both seem to use the same amount of gas (at least in this case). And can you rewrite over a struct? Looks like you
+can for balances but I don't know how to rewrite over elements of struct so that it can show updated values...(I know the way it's written
+now that I am just adding additional elements to the struct, not overwriting any old ones.)
+
+Question 2
+The kill switch...it says that "Even if a contract’s code does not contain a call to selfdestruct, it can still perform that 
+operation using delegatecall or callcode." Can you use "delegatecall" or "callcode" to use selfdestruct to send the funds back to the owner
+as well? Is there any way someone could hack a contract to selfdestruct and send funds to a wrong address? 
