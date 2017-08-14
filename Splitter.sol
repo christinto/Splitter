@@ -9,11 +9,6 @@ pragma solidity ^0.4.6;
 
 contract Splitter{
     address public owner; //Alice
-    address public recipientOne; //Carol
-    address public recipientTwo; //Bob
-    address public splitAd; //contract address
-    uint    public _amount; //total amount to send
-    uint    public newAmount; //To send to Carol or Bob
     mapping (address => uint) public balances; //Mapping each address to their balance
 
 // Struct to show address and balances together.
@@ -26,88 +21,74 @@ ShowBalances[] public showBalances;
 
 //Constructor - run once when contract deployed 
 function Splitter()
-payable //Ether can be sent to the contract
 {
     //Identifying owner
-    owner = msg.sender; 
-    
-    //Showing balances in Struct
-    ShowBalances memory newBalance0;
-    newBalance0.someOne = this; 
-    newBalance0.money = this.balance;
-    showBalances.push(newBalance0);
-    ShowBalances memory newBalance1;
-    newBalance1.someOne = msg.sender; 
-    newBalance1.money = owner.balance; 
-    showBalances.push(newBalance1);
-    
-    //Showing balances in mapping variables
-    splitAd = this; 
-    balances[splitAd] = this.balance; 
-    balances[owner] = owner.balance; 
-    
+    owner = msg.sender;        
  }
 
-
-//Send ether to recipient1 and recipient2 (Bob & Carol)
-function splitIt(address recipient1, address recipient2, uint amount)
+//Takes in the amount to send to Bob & Carol
+function toPut()
     public
     payable
     returns(bool success)
     {
         //Cases to stop early (throw)
-        _amount = amount; 
-        if (this.balance < _amount) throw; // if contract does not have enough money, cannot send 
-        //but you can send less than the balance of the contract
         if (msg.sender != owner) throw; //if function not sent by owner
-        recipientOne = recipient1; 
-        recipientTwo = recipient2; 
-        newAmount = amount/2;
-        recipientOne.transfer(newAmount); //transfer throws only failure - what happens if address for only Bob or only Carol is incorrect?
-        recipientTwo.transfer(newAmount); 
-        
-        //Showing new balances - mapping
-        balances[recipientOne] = recipientOne.balance;
-        balances[recipientTwo] = recipientTwo.balance;
-        balances[owner] = owner.balance; 
-        balances[splitAd] = this.balance; 
-        
-        //Showing new balances - 
-        ShowBalances memory newBalance0;
-        newBalance0.someOne = this; 
-        newBalance0.money = this.balance;
-        showBalances.push(newBalance0);
-        ShowBalances memory newBalance1;
-        newBalance1.someOne = msg.sender; 
-        newBalance1.money = owner.balance; 
-        showBalances.push(newBalance1);
-        ShowBalances memory newBalance2;
-        newBalance2.someOne = recipientOne; 
-        newBalance2.money += recipientOne.balance; 
-        showBalances.push(newBalance2);
-        ShowBalances memory newBalance3;
-        newBalance3.someOne = recipientTwo; 
-        newBalance3.money += recipientTwo.balance;
-        showBalances.push(newBalance3);
+        if (msg.value < 0) throw; 
         return true;
- 
     }
 
-//Sending ether to the contract from the webpage, sending as message value
-function sendIt()
-    public 
-    payable
-    returns(bool success)
+//Sending funds to Bob or Carol
+function toSend(address toPerson)
+    public
+    returns (bool success)
+    //Assuming no need to make this payable as funds paid through toSend()
     {
-        return true; 
+    //Cases to throw
+    if (msg.sender != owner) throw;
+    if (this.balance <= 0) throw; 
+    //Send money
+    toPerson.transfer(this.balance/2);
+    return true;
     }
 
-//Self destructing kill switch, only works for contract creator, private
+//How to show balances for the website? Will wait for feedback.
+        
+        // //Showing new balances - mapping
+        // balances[recipientOne] = recipientOne.balance;
+        // balances[recipientTwo] = recipientTwo.balance;
+        // balances[owner] = owner.balance; 
+        // balances[splitAd] = this.balance; 
+        
+        // //Showing new balances - 
+        // ShowBalances memory newBalance0;
+        // newBalance0.someOne = this; 
+        // newBalance0.money = this.balance;
+        // showBalances.push(newBalance0);
+        // ShowBalances memory newBalance1;
+        // newBalance1.someOne = msg.sender; 
+        // newBalance1.money = owner.balance; 
+        // showBalances.push(newBalance1);
+        // ShowBalances memory newBalance2;
+        // newBalance2.someOne = recipientOne; 
+        // newBalance2.money += recipientOne.balance; 
+        // showBalances.push(newBalance2);
+        // ShowBalances memory newBalance3;
+        // newBalance3.someOne = recipientTwo; 
+        // newBalance3.money += recipientTwo.balance;
+        // showBalances.push(newBalance3);
+       
+//Self destructing kill switch, only works for contract creator
+// Are you able to test selfdestruct() in browser solidity? 
 function stopIt()
-    private
-    returns (bool succes)
+    public 
+    returns (bool success)
     {
     if (msg.sender != owner) throw; //extra check, just in case
     selfdestruct(owner); //send all funds back to owner
+    return true;
     }
 }
+        
+    
+  
