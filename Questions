@@ -11,3 +11,9 @@ Question 2
 The kill switch...it says that "Even if a contract’s code does not contain a call to selfdestruct, it can still perform that 
 operation using delegatecall or callcode." Can you use "delegatecall" or "callcode" to use selfdestruct to send the funds back to the owner
 as well? Is there any way someone could hack a contract to selfdestruct and send funds to a wrong address? 
+
+Quesiton 3
+Would you explain a little more when to use send (returns false) versus transfer (throws on failure)? I was thinking in this case
+it would be better to transfer (throw on failure) because if some funds went to only Bob or only Carol that would not be a good contract. 
+(i.e. What if we accidently input a bad address for one of them (Carol or Bob), and funds only transferred to the good address?). When 
+would it be good to use send? 
