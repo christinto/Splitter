@@ -1,95 +1,126 @@
 //Splitter - Small Project 
-//3 people - Alice, Bob & Carol 
-//Balances can be seen on splitter contract webpage
-//Whenever Alice sends ether - Alice sends 
-//Half go to Bob and half goes to Carol - pulled 
-//Can see the balances of Alice, Bob & Carol on the webpage
-//Ether can be send to the contract from the webpage
 
-pragma solidity ^0.4.6;//Splitter - Small Project 
-//3 people - Alice, Bob & Carol 
-//Balances can be seen on splitter contract webpage
-//Whenever Alice sends ether - Alice sends 
-//Half go to Bob and half goes to Carol - pulled 
-//Can see the balances of Alice, Bob & Carol on the webpage
-//Ether can be send to the contract from the webpage
 
 pragma solidity ^0.4.6;
 
 contract Splitter{
-    address public owner; //"Alice"
-    //Mapping each address to their balance. Only need to
-    //know balances by account
+    //Alice or whomever sends money to the contract to be split.
+    address public owner;
+    uint    public  theRemainder; 
+    //Mapping each address to their balance. 
     mapping (address => uint) public balances; 
+    
+//Can be listened to on Javascript end, displyed on website. I want to display balances
+//for all three people and the contract itself
+event trackingBalances(address thePerson, uint amount);
 
-
-//Constructor - run once when contract deployed 
+//Constructor - run once when contract deployed. Not payable to avoid confusion
+//of sending ether during deployment. 
 function Splitter()
-//Not payable to avoid confusion of sending Ether during deployment. 
 {
-    //Identifying owner
+    //Identifying owner of the contract
     owner = msg.sender;
+}
+
+modifier isValueLessThanZero(uint value) {
+  if (!(value > 0)){
+      throw; 
+  } 
+  else{
+    _;  
+  }
+}
+
+modifier onlyOwner {
+    if (owner != msg.sender){
+        throw; 
+    } else {
+        _;
+    }
 }
 
 
 //Takes in the amount to send to Bob & Carol
 function deposit(address recipient1, address recipient2)
+    isValueLessThanZero(msg.value)
     public
     payable
     returns(bool success)
+
 {
-        //Cases to stop early (throw)
-        if (msg.sender != owner) throw; //if function not sent by owner
-        if (msg.value < 0) throw; 
-        //Base unit for contracts is wei, if division of odd number, remainder 
-        //stays with the contract. Best to throw contract if there is an odd value
-        //with a remainder...(?)
-        if (msg.value % 2 !=0) throw; 
-        //Mapping balances - showing balance of contract
-        balances[this] += msg.value; 
-        //Go ahead and update balance of recipients since money is already here (?)
-        balances[recipient1] += msg.value/2; 
+        //Trying alternatives, favor recipient 1 in the case of uneven numbers
+        theRemainder = msg.value % 2;
+        //Mapping balances, favoring first recipient. 
+        balances[recipient1] += msg.value/2 + theRemainder; 
         balances[recipient2] += msg.value/2; 
+        
+        trackingBalances(msg.sender, msg.sender.balance);
+        trackingBalances(recipient1, balances[recipient1]);
+        trackingBalances(recipient2, balances[recipient2]);
+        trackingBalances(this, this.balance);
+        
         return true;
+
 }
+
+
 
 //Sending funds to Bob or Carol. Only the action. 
 function withdraw()
     public 
     returns (bool success)
 {
-    //Assuming no need to make this payable as funds paid through deposit()
     //Cases to throw - how to make sure only Bob or Carol can withdraw funds?
     //Use the balances identified above to send money. This should make sure that 
     //only those with identified balances can be sent their balances
     //Bob is paying gas when withdrawing - can contract send gas to another funciton so he doesn't have to pay?
-    if (balances[msg.sender] <=0 ) throw;
-    msg.sender.call.gas(3000000)(secondWithdraw()); 
+    if (balances[msg.sender] <= 0) throw;
+    var toSend = balances[msg.sender];
+    balances[msg.sender] -= balances[msg.sender];
+    //In case trying to have contract pay gas. I still couldn't get this work correctly...
+    // if (!msg.sender.call.gas(3000000).value(toSend)()) throw; 
+    if (!msg.sender.send(toSend)) throw; 
+    trackingBalances(this, this.balance);
+    trackingBalances(msg.sender, 0);
+    
     return true; 
 }
 
-function secondWithdraw()
-    private
-    returns (bool success)
-{
-    if (balances[msg.sender] <= 0) throw; 
-    if (!msg.sender.send(balances[msg.sender])) throw;
-    //What if Bob comes back and tries to steal Carol's funds before she gets them? 
-    balances[msg.sender] -= balances[msg.sender];
-    return true;
-}
-   
-    
+
 //Self destructing kill switch, only works for contract creator
-// Are you able to test selfdestruct() in browser solidity? 
 function stopIt()
+    onlyOwner()
     public 
-    returns (bool success)
-    {
-    if (msg.sender != owner) throw; //extra check, just in case
+{
+    //Can only self distruct via the owner of the contract. 
     selfdestruct(owner); //send all funds back to owner
-    return true;
-    }
+    //No returns
 }
+
+}
+
+contract ThrowProxy {
+  address public target;
+  bytes data;
+
+  function ThrowProxy(address _target) {
+    target = _target;
+  }
+
+  //prime the data using the fallback function.
+  function() {
+    data = msg.data;
+  }
+
+  function execute() returns (bool) {
+    return target.call(data);
+  }
+}
+
+
+
+
+
+
 
 
