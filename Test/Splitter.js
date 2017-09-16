@@ -1,4 +1,5 @@
 var Splitter = artifacts.require("./Splitter.sol");
+web3.eth.getTransactionReceiptMined = require("./getTransactionReceiptMined.js");
 
 //Already have Chaijs library here
 /*What should we test with splitter? 
@@ -13,7 +14,7 @@ contract('Splitter', function(accounts){
   var owner =  accounts[0]; //Alice
   var bob = accounts[1]; //Bob
   var carol = accounts[2]; //Carol
-   //Amounts sent to contract
+  //Amounts sent to contract
   var amount1 = web3.toWei(10, "ether"); //Test an even number
   var amount2 = web3.toWei(9, "ether"); //Test an odd number
   var amount3 = 0; //Test zero 
@@ -39,7 +40,7 @@ contract('Splitter', function(accounts){
   });
 
   //First test, contract should take in Alice's even deposits
-  it("Should take Alice's even deposits.", function(){
+  it("Should take Alice's deposits.", function(){
     var alicesDeposit;
     var contractAddress; 
     return contract.deposit(bob, carol, {from:owner, gas: 3000000, value: amount1})
@@ -55,24 +56,22 @@ contract('Splitter', function(accounts){
       var bobsBalNew; 
       var diff; 
       var bobsBalOld = web3.eth.getBalance(accounts[1]);
+      var carolsBalNew; 
+      var diff2; 
+      var carolsBalOld = web3.eth.getBalance(accounts[2]);
+      var gasCost;
       return contract.deposit(bob, carol, {from:owner, value:amount1})
       .then(function(txn){
       return contract.withdraw({from:bob})
-      .then(function(txn){
-       bobsBalNew = web3.eth.getBalance(bob); 
-       diff = bobsBalNew.minus(bobsBalOld);
-       assert.equal(diff.toString(10), amount1/2, "Bob didn't get correct funds.") 
+      .then(function(txn2){
+        bobsBalNew = web3.eth.getBalance(bob); 
+        diff = bobsBalNew.minus(bobsBalOld);
+        carolsBalNew = web3.eth.getBalance(carol);
+        diff2 = carolsBalOld.minus(carolsBalNew);
+        assert.equal(diff.toString(10), amount1/2, "Bob didn't get correct funds.")
+        assert.equal(diff2.toString(10), amount1/2, "Carol didn't get the correct funds.")         
         });
      });
   });
- });
-  //Second test, contract should throw odd deposits 
-  //Third test, contract should throw 0 value deposits
+});
 
-  // //Fourth/Fifth test, contract should give funds to Bob or Carol 
-  // it("Should give funds to Bob", function (){
-  //   return contract.withdraw({from:bob});
-  //   then(function(txn){
-      
-  //   });
-  // });
