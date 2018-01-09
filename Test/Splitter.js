@@ -1,77 +1,114 @@
-var Splitter = artifacts.require("./Splitter.sol");
-web3.eth.getTransactionReceiptMined = require("./getTransactionReceiptMined.js");
-
-//Already have Chaijs library here
-/*What should we test with splitter? 
-First splitter should allow "Alice" to send the Ether to the contract - compare before and after balances of Alice?
-Second splitter should send coins to Carol & Bob, compare the before and after balances 
-*/
+/* Pull in Splitter Contract */
+let Splitter = artifacts.require("./Splitter.sol");
 
 contract('Splitter', function(accounts){
-  //Variables to establish here
-  var contract; //Instance of contract deployed
-  //Address to save
-  var owner =  accounts[0]; //Alice
-  var bob = accounts[1]; //Bob
-  var carol = accounts[2]; //Carol
+  
+  let contract; //Instance of contract deployed
+  //Addresses to save
+  let owner =  accounts[0]; //Alice
+  let bob = accounts[1]; //Bob
+  let carol = accounts[2]; //Carol
+
   //Amounts sent to contract
-  var amount1 = web3.toWei(10, "ether"); //Test an even number
-  var amount2 = web3.toWei(9, "ether"); //Test an odd number
-  var amount3 = 0; //Test zero 
+  let amount1 = 10; //Test an even number
+  let amount2 = 9 //Test an odd number
+  let amount3 = 0; //Test zero 
 
+  /* Steps to take before each test run, deploy contract each time to start
+  at same base case. */
+  beforeEach(async function(){
+    contract = await Splitter.new(); 
+  });
+
+   //Contract should be owned by Alice
+  describe("Ownership", async function() {
+    it("Should be owned by Alice.", async function(){
+      let splitterowner = await contract.owner({from:owner})
+      assert.strictEqual(splitterowner, owner, "Contract not owned by Alice.")
+    });
+  })
  
+  
+  /* Contract should take in Alice's (or whomever's) even deposits and split evenly, contract should also 
+  assign correct balances to Bob & Carol. */
+  describe("Even deposits", async function(){
+    it("Should take Alice's even deposits and split evenly", async function(){
+      try {
+        await contract.deposit(bob, carol, {from: owner, value: amount1});
+      } catch (e) {
+        return console.log(e);
+      } finally {
+        //Check contract balance
+        let contractAddress = contract.address; 
+        let contractBal = web3.eth.getBalance(contractAddress);
+        assert.equal(contractBal.toString(10), web3.toWei(amount1, "wei"), "Deposit not received.")
+        //Check balance assigned to Bob
+        let bobsbalance = await contract.balances(bob);
+        assert.strictEqual(bobsbalance.toString(10), web3.toWei(5, "wei"), "Bob's value was not assigned.")
+        //Check balance assigned to Carol
+        let carolsbalance = await contract.balances(carol);
+        assert.strictEqual(carolsbalance.toString(10), web3.toWei(5, "wei"), "Bob's value was not assigned.")
+      }
+    })
+  })
 
-  //Steps to take before each test runs, deploy contract each time to 
-  //start at "same base case"
-  beforeEach(function(){
-    return Splitter.new({from:owner})
-    //Store the instance
-    .then(function(instance){
-      contract = instance; 
-    });
-  });
+  /* Contract should take in Alice's (or whomever's) odd deposits and assign balances, favoring the first address given. */
+  describe("Odd deposits", async function(){
+    it("Should take Alice's odd deposits and split favoring the first address", async function(){
+      try {
+        await contract.deposit(bob, carol, {from: owner, value: amount2});
+      } catch (e) {
+        return console.log(e);
+      } finally {
+        //Check contract balance
+        let contractAddress = contract.address; 
+        let contractBal = web3.eth.getBalance(contractAddress);
+        assert.equal(contractBal.toString(10), amount2, "Deposit not received.")
+        //Check balance assigned to Bob
+        let bobsbalance = await contract.balances(bob);
+        assert.strictEqual(bobsbalance.toString(10), web3.toWei(5, "wei"), "Bob's value was not assigned.")
+        //Check balance assigned to Carol
+        let carolsbalance = await contract.balances(carol);
+        assert.strictEqual(carolsbalance.toString(10), web3.toWei(4, "wei"), "Bob's value was not assigned.")
+      }
+    })
+  })
 
-  //First test, contract should be owned by Alice
-  it("Should be owned by Alice.", function(){
-    return contract.owner({from:owner})
-    .then(function(_owner){
-      assert.strictEqual(_owner, owner, "Contract not owned by Alice.")
-    });
-  });
+  /* Contract should allow Bob to withdrawl his assigned balances and only that. */
+  describe("Withdrawling assigned balances", async function(){
+    it("Should allow Bob & Carol to withdrawl the fund split between them.", async function(){
+      try {
+        await contract.deposit(bob, carol, {from: owner, value: amount1});
+        await contract.withdraw({from:bob});
+        await contract.withdraw({from:carol})
+      } catch (e) {
+        return console.log(e);
+      } finally {
+        //Check balance assigned to Bob, should be zero after withdrawl
+        let bobsbalance = await contract.balances(bob);
+        assert.strictEqual(bobsbalance.toString(10), web3.toWei(0, "wei"), "Bob was not able to withdrawl funds.");
+        //Check balance assigned to Carol, should be zero after withdrawl
+        let carolsbalance = await contract.balances(carol);
+        assert.strictEqual(carolsbalance.toString(10), web3.toWei(0, "wei"), "Carol was not able to withdrawl funds.")
+      }
+    })
+  })
+  
+  /* Testing for self destruct to work with correct owner. */
 
-  //First test, contract should take in Alice's even deposits
-  it("Should take Alice's deposits.", function(){
-    var alicesDeposit;
-    var contractAddress; 
-    return contract.deposit(bob, carol, {from:owner, gas: 3000000, value: amount1})
-    .then(function(txn){
-      contractAddress = contract.address; 
-      alicesDeposit = web3.eth.getBalance(contractAddress);
-      assert.equal(alicesDeposit.toString(10), amount1, "Even amount not received.");
-      });
-    });
+  describe("Selfdestruct tests", async function(){
+    it("Should not allow Bob to selfdestruct", async function(){
+      try {
+        await contract.stopIt({from: bob})
+      } catch (e) {
+        return 
+        //No returns because there should be an error here. 
+      } finally {
+        let contractcode = web3.eth.getCode(contract.address);
+        assert.isOk(contractcode, "Contract was not selfdestructed as expected.")
+      }
+    })
+  })
 
-  //Second test, contract should give funds to Bob when he calls it
-  it("Should give funds to Bob.", function(){
-      var bobsBalNew; 
-      var diff; 
-      var bobsBalOld = web3.eth.getBalance(accounts[1]);
-      var carolsBalNew; 
-      var diff2; 
-      var carolsBalOld = web3.eth.getBalance(accounts[2]);
-      var gasCost;
-      return contract.deposit(bob, carol, {from:owner, value:amount1})
-      .then(function(txn){
-      return contract.withdraw({from:bob})
-      .then(function(txn2){
-        bobsBalNew = web3.eth.getBalance(bob); 
-        diff = bobsBalNew.minus(bobsBalOld);
-        carolsBalNew = web3.eth.getBalance(carol);
-        diff2 = carolsBalOld.minus(carolsBalNew);
-        assert.equal(diff.toString(10), amount1/2, "Bob didn't get correct funds.")
-        assert.equal(diff2.toString(10), amount1/2, "Carol didn't get the correct funds.")         
-        });
-     });
-  });
 });
 

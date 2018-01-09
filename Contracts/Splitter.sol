@@ -1,123 +1,84 @@
 //Splitter - Small Project 
 
 
-pragma solidity ^0.4.6;
+pragma solidity ^0.4.18;
 
 contract Splitter{
-    //Alice or whomever sends money to the contract to be split.
+    
+    //Owner of contract, sole ability to destroy/kill contract.
     address public owner;
-    uint    public  theRemainder; 
+
     //Mapping each address to their balance. 
     mapping (address => uint) public balances; 
-    
-//Can be listened to on Javascript end, displyed on website. I want to display balances
-//for all three people and the contract itself
-event trackingBalances(address thePerson, uint amount);
 
-//Constructor - run once when contract deployed. Not payable to avoid confusion
-//of sending ether during deployment. 
+    //Events
+    event LogSplitSent(address sender, address recipient1, address recipient2, uint totalamount);
+    event LogSplitPulled(address recipient, uint split);
+
+/* Constructor - run once when contract deployed. Not payable to avoid confusion
+of sending ether during deployment.*/
+
 function Splitter()
 {
-    //Identifying owner of the contract
+    //Save owner of contract as address who deployed to blockchain.
     owner = msg.sender;
 }
 
-modifier isValueLessThanZero(uint value) {
-  if (!(value > 0)){
-      throw; 
-  } 
-  else{
-    _;  
-  }
-}
+//Modifiers
+modifier notZero(uint value) {require(value >0); _;}
+modifier onlyOwner {require(msg.sender == owner); _;}
 
-modifier onlyOwner {
-    if (owner != msg.sender){
-        throw; 
-    } else {
-        _;
-    }
-}
-
-
-//Takes in the amount to send to Bob & Carol
+/* Function in which sender can send money to contract to be split 
+between two identified recipients. Method for odd values that do not 
+split evenly, the contract favors recipient1. */
 function deposit(address recipient1, address recipient2)
-    isValueLessThanZero(msg.value)
+    notZero(msg.value)
     public
     payable
     returns(bool success)
 
 {
-        //Trying alternatives, favor recipient 1 in the case of uneven numbers
-        theRemainder = msg.value % 2;
+        //Ensure Ethereum address used. Will also ensure this through Web3. 
+        require(recipient1 != 0);
+        require(recipient2 != 0);
+        uint remainder = msg.value % 2;
         //Mapping balances, favoring first recipient. 
-        balances[recipient1] += msg.value/2 + theRemainder; 
+        balances[recipient1] += msg.value/2 + remainder; 
         balances[recipient2] += msg.value/2; 
-        
-        trackingBalances(msg.sender, msg.sender.balance);
-        trackingBalances(recipient1, balances[recipient1]);
-        trackingBalances(recipient2, balances[recipient2]);
-        trackingBalances(this, this.balance);
-        
+        LogSplitSent(msg.sender, recipient1, recipient2, msg.value);
         return true;
-
 }
 
-
-
-//Sending funds to Bob or Carol. Only the action. 
+/* Function to allow recipients to withdraw their funds from the contract. */
 function withdraw()
     public 
     returns (bool success)
 {
-    //Cases to throw - how to make sure only Bob or Carol can withdraw funds?
-    //Use the balances identified above to send money. This should make sure that 
-    //only those with identified balances can be sent their balances
-    //Bob is paying gas when withdrawing - can contract send gas to another funciton so he doesn't have to pay?
-    if (balances[msg.sender] <= 0) throw;
-    var toSend = balances[msg.sender];
-    balances[msg.sender] -= balances[msg.sender];
-    //In case trying to have contract pay gas. I still couldn't get this work correctly...
-    // if (!msg.sender.call.gas(3000000).value(toSend)()) throw; 
-    if (!msg.sender.send(toSend)) throw; 
-    trackingBalances(this, this.balance);
-    trackingBalances(msg.sender, 0);
-    
+    require(balances[msg.sender] > 0);
+    uint toSend = balances[msg.sender];
+    balances[msg.sender] = 0;
+    msg.sender.transfer(toSend);
+    LogSplitPulled(msg.sender, toSend);
     return true; 
 }
 
 
-//Self destructing kill switch, only works for contract creator
+/* Self destructing kill switch, only works for contract creator. 
+In this case, contract users must trust contract creator to control
+kill switch. */
+
 function stopIt()
     onlyOwner()
     public 
 {
-    //Can only self distruct via the owner of the contract. 
-    selfdestruct(owner); //send all funds back to owner
-    //No returns
+    selfdestruct(owner); //All funds in contract sent to owner. 
 }
 
 }
 
-contract ThrowProxy {
-  address public target;
-  bytes data;
-
-  function ThrowProxy(address _target) {
-    target = _target;
-  }
-
-  //prime the data using the fallback function.
-  function() {
-    data = msg.data;
-  }
-
-  function execute() returns (bool) {
-    return target.call(data);
-  }
-}
-
-
+/* Idea for refactoring: Seperate out record keeping of balances in a different contract while retaining
+Ether in this one. Create another contract that can be used as an address for self destruct to let those
+who have balances remaining in this contract pull from it. */
 
 
 
